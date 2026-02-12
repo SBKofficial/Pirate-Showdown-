@@ -621,8 +621,8 @@ async def unlock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔄 **Unlocking ALL players...** (This may take a moment)")
         
         try:
-            # 🟢 FIXED: Used 'users_collection' instead of 'collection'
-            result = users_collection.update_many(
+            # 🟢 FIXED: Using the correct name 'players_collection'
+            result = players_collection.update_many(
                 {"is_locked": True},
                 {"$set": {"is_locked": False, "verification_active": False, "last_interaction": 0}}
             )
@@ -652,7 +652,7 @@ async def unlock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text=f"🚨 **GLOBAL UNLOCK** initiated by {update.effective_user.first_name}!"
                 )
             except:
-                pass # Log failed, but action succeeded
+                pass 
             
         except Exception as e:
             await update.message.reply_text(f"❌ Database Error: {e}")
