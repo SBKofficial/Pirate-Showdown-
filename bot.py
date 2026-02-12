@@ -2182,19 +2182,27 @@ async def unstuck_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def auto_detector_job(context: ContextTypes.DEFAULT_TYPE):
     current_time = time.time()
-    
-    # Iterate through a copy of items to avoid runtime errors if dict changes
+
+    # Iterate through a copy of items to avoid runtime errors
     for uid, p in list(player_cache.items()):
         last_act = p.get('last_interaction', 0)
-        
-        # Check: Active in last 5 mins (300s) AND not already locked/verifying
-        if (current_time - last_act < 300) and not p.get('is_locked') and not p.get('verification_active'):
-            try:
-                await trigger_security_check(uid, context)
-                # Small sleep to prevent hitting Telegram Flood Limits
-                await asyncio.sleep(0.1) 
-            except Exception as e:
-                logging.error(f"Security check failed for {uid}: {e}")
+        time_diff = current_time - last_act
+
+        # 1. PRIMARY FILTER: Active in the last 5 minutes (300s)
+        # Also ensure they aren't already locked or currently being verified
+        if (time_diff < 300) and not p.get('is_locked') and not p.get('verification_active'):
+            
+            # 2. SECONDARY FILTER: Active in the last 5 seconds
+            # This targets the "Instant Clickers" specifically at the patrol time
+            if time_diff < 5:
+                try:
+                    # 3. ACTION: Send Captcha
+                    await trigger_security_check(uid, context)
+                    # Small sleep to prevent hitting Telegram Flood Limits
+                    await asyncio.sleep(0.1) 
+                except Exception as e:
+                    logging.error(f"Security check failed for {uid}: {e}")
+
 
 async def get_file_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fid = update.message.photo[-1].file_id if update.message.photo else (update.message.video.file_id if update.message.video else None)
