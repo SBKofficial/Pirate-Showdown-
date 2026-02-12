@@ -38,11 +38,33 @@ RARITY_STYLES = {
 }
 
 RIDDLES = [
+    # --- BASICS ---
     {"hint": "the object to stop a ship 🛑", "correct": "⚓️", "options": ["⚔️", "⚓️", "🧭"]},
     {"hint": "the weapon of a true swordsman 🤺", "correct": "⚔️", "options": ["🏹", "⚔️", "🛡"]},
     {"hint": "what you need to steer the ship ☸️", "correct": "☸️", "options": ["🛶", "⚓️", "☸️"]},
-    {"hint": "the Jolly Roger 🏴‍☠️", "correct": "🏴‍☠️", "options": ["🚩", "🏳️", "🏴‍☠️"]}
+    {"hint": "the Jolly Roger flag 🏴‍☠️", "correct": "🏴‍☠️", "options": ["🚩", "🏳️", "🏴‍☠️"]},
+    {"hint": "used to find treasure 🗺️", "correct": "🗺️", "options": ["📜", "🗺️", "🔭"]},
+    {"hint": "used to spot land from afar 🔭", "correct": "🔭", "options": ["🔫", "🔭", "🕯️"]},
+    
+    # --- ONE PIECE LORE ---
+    {"hint": "the fruit that gives powers 🍇", "correct": "😈", "options": ["🍎", "😈", "🍌"]},
+    {"hint": "the currency of the seas 💰", "correct": "🍇", "options": ["🍇", "💵", "💎"]},
+    {"hint": "Luffy's favorite food 🍖", "correct": "🍖", "options": ["🍜", "🍖", "🍙"]},
+    {"hint": "Zoro's drink of choice 🍶", "correct": "🍶", "options": ["🥛", "🍶", "🍵"]},
+    {"hint": "Nami's favorite fruit 🍊", "correct": "🍊", "options": ["🍊", "🍒", "🍑"]},
+    {"hint": "Sanji's weapon (his legs) 🦵", "correct": "🦵", "options": ["👊", "🦵", "🗡️"]},
+    {"hint": "Chopper's favorite sweet 🍬", "correct": "🍬", "options": ["🍬", "🍰", "🍫"]},
+    {"hint": "Franky's fuel source 🥤", "correct": "🥤", "options": ["⛽", "🥤", "☕"]},
+    
+    # --- COMBAT & ITEMS ---
+    {"hint": "protects you from attacks 🛡️", "correct": "🛡️", "options": ["🛡️", "⚔️", "🧶"]},
+    {"hint": "fires explosive balls 💣", "correct": "💣", "options": ["🎱", "💣", "🏺"]},
+    {"hint": "a sniper's best friend 🎯", "correct": "🏹", "options": ["🏹", "🎣", "🦯"]},
+    {"hint": "the Log Pose compass 🧭", "correct": "🧭", "options": ["⌚", "🧭", "⏲️"]},
+    {"hint": "a Marine ship 🛳️", "correct": "🛳️", "options": ["🛳️", "⛵", "🛶"]},
+    {"hint": "the treasure chest 📦", "correct": "📦", "options": ["📦", "📪", "🧱"]}
 ]
+
 ADMIN_IDS = [5242138546 , 7708811819]
 # =====================
 # LOGGING SETUP
