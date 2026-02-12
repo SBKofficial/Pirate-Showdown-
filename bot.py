@@ -2112,6 +2112,7 @@ async def post_init(application):
         BotCommand("mycollection", "View Crew"), 
         BotCommand("inventory", "Treasury"),
         BotCommand("myprofile", "Player Profile"), 
+        BotCommand("unlock", "Unlock Player"),
         BotCommand("unstuck", "Reset Stuck Session"), # FIXED: Corrected spelling
         BotCommand("sendberry", "Gift Berries"), 
         BotCommand("sendclovers", "Gift Clovers"), 
