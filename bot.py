@@ -1046,7 +1046,7 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
     p1_char = b['p1_team'][b['p1_idx']]
     p2_char = b['p2_team'][b['p2_idx']]
 
-    # Determine Attacker and Defender roles
+    # Determine roles
     if b['turn_owner'] == "p1":
         attacker, defender, att_p, def_p, att_team = p1_char, p2_char, "p1", "p2", b['p1_team']
     else:
@@ -1059,13 +1059,14 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
         b['turn_owner'] = def_p
         await show_move_selection(query, battle_id, log, context)
         if b.get('is_npc') and b['turn_owner'] == "p2":
-            await asyncio.sleep(0.5) # Snappy 0.5s NPC response
+            await asyncio.sleep(0.5) 
             await run_battle_turn(query, battle_id, move_name=None, context=context)
         return
 
-    # 2. NPC AI LOGIC (1 Move + 1 Ult System)
+    # 2. NPC AI LOGIC (Snappy 0.5s response)
     if b.get('is_npc') and b['turn_owner'] == "p2":
-        [span_0](start_span)basic_move = attacker['moves'][0] # Uses only moves[0] to prevent IndexError[span_0](end_span)
+        # Uses only moves[0] to prevent IndexError from old multi-move system
+        basic_move = attacker['moves'][0] 
         if not attacker.get('ult_used') and random.random() < 0.3:
             move_name = attacker['ult']
         else:
@@ -1080,13 +1081,12 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
         log = f"💨 **{defender['name']}** dodged the attack!"
         attacker['dodge_chance'] = 0
     else:
-        # 4. DAMAGE CALCULATION (Using scaled stats)
+        # 4. DAMAGE CALCULATION
         move_data = MOVES.get(move_name, MOVES["Strike"])
         is_ult = (move_name == attacker['ult'])
         
         if is_ult:
             attacker['ult_used'] = True
-            # Ultimate Visuals
             if attacker['name'] == "Yamato":
                 img = YAMATO_EXPLORE_ULT if b.get('is_npc') else YAMATO_ULT_VIDEO
                 try: await query.message.reply_photo(photo=img, caption="⚡️ **THUNDER BAGUA!**")
@@ -1096,7 +1096,7 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
                 try: await query.message.reply_photo(photo=img, caption="⚡️ **DAMNED PUNK!**")
                 except: pass
 
-        # damage = (Attacker ATK + Move DMG + Base) - Defender DEF
+        # Damage Formula using scaled stats
         damage = max(5, (random.randint(attacker.get('atk_min', 20), attacker.get('atk_max', 30)) + move_data['dmg'] + 120) - defender.get('def', 10))
         defender['hp'] -= damage
         log = f"🔥 **{attacker['name']}** uses **{move_name}**!\n💥 Deals **{damage}** DMG!"
@@ -1107,17 +1107,10 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
             if effect == "def_buff_10": attacker['def'] += 10
             elif effect == "team_heal_50":
                 for char in att_team: char['hp'] = min(char['max_hp'], char['hp'] + 50)
-            elif effect == "atk_buff_15_2":
-                attacker['atk_min'] = int(attacker['atk_min'] * 1.15)
-                attacker['atk_max'] = int(attacker['atk_max'] * 1.15)
             elif effect == "dodge_30": attacker['dodge_chance'] = 30
-            elif effect == "usopp_ult":
-                defender['def'] = int(defender['def'] * 0.95); attacker['hp'] = min(attacker['max_hp'], attacker['hp'] + 25); defender['stunned'] = True
-            elif effect == "team_atk_5":
-                for char in att_team: char['atk_min'] = int(char['atk_min'] * 1.05); char['atk_max'] = int(char['atk_max'] * 1.05)
             elif effect == "stun_1": defender['stunned'] = True
 
-    # 6. DEATH & REWARDS LOGIC (With Separate Rank Up Display)
+    # 6. DEATH & REWARDS LOGIC (Ultra-Fast Cache Updates)
     if defender['hp'] <= 0:
         defender['hp'] = 0
         b[f'{def_p}_idx'] += 1
@@ -1162,7 +1155,7 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
                         f"฿ Bounty: `+{lvls * 40}`"
                     )
                 
-                save_player(uid, p) # Instant RAM update + Background DB sync
+                save_player(uid, p) # RAM update + Background DB sync
 
                 final_ui = (
                     f"◈☰☰☰⚔️ ＢＡＴＴＬＥ ＲＥＳＵＬＴ ⚔️☰☰☰◈\n\n"
@@ -1181,7 +1174,7 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
 
             if battle_id in battles: del battles[battle_id]
 
-            # [span_1](start_span)[span_2](start_span)FIX: Use edit_message_caption for media messages[span_1](end_span)[span_2](end_span)
+            # FIX: Use edit_message_caption to prevent 'no text to edit' crash on images
             try:
                 await query.edit_message_caption(caption=final_ui, parse_mode="Markdown")
             except Exception:
