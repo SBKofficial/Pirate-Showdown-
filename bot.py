@@ -1035,6 +1035,7 @@ def get_bar(h, m):
     filled = int(ratio * 10)
     return "█" * filled + "▒" * (10 - filled)
 
+
 async def run_battle_turn(query, battle_id, move_name=None, context=None):
     b = battles.get(battle_id)
     if not b: return
@@ -1055,12 +1056,11 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
         b['turn_owner'] = def_p
         await show_move_selection(query, battle_id, log, context)
         if b.get('is_npc') and b['turn_owner'] == "p2":
-            # Reduced delay for snappy response
             await asyncio.sleep(0.5) 
             await run_battle_turn(query, battle_id, move_name=None, context=context)
         return
 
-    # 2. NPC AI LOGIC (1 Move + 1 Ult System)
+    # 2. NPC AI LOGIC
     if b.get('is_npc') and b['turn_owner'] == "p2":
         basic_move = attacker['moves'][0]
         if not attacker.get('ult_used') and random.random() < 0.3:
@@ -1083,7 +1083,6 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
         
         if is_ult:
             attacker['ult_used'] = True
-            # Visual alerts for Ultimates
             if attacker['name'] == "Yamato":
                 img = YAMATO_EXPLORE_ULT if b.get('is_npc') else YAMATO_ULT_VIDEO
                 try: await query.message.reply_photo(photo=img, caption="⚡️ **THUNDER BAGUA!**")
@@ -1093,7 +1092,6 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
                 try: await query.message.reply_photo(photo=img, caption="⚡️ **DAMNED PUNK!**")
                 except: pass
 
-        # Core Damage Formula
         damage = max(5, (random.randint(attacker.get('atk_min', 20), attacker.get('atk_max', 30)) + move_data['dmg'] + 120) - defender.get('def', 10))
         defender['hp'] -= damage
         log = f"🔥 **{attacker['name']}** uses **{move_name}**!\n💥 Deals **{damage}** DMG!"
@@ -1118,7 +1116,7 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
                     char['atk_max'] = int(char['atk_max'] * 1.05)
             elif effect == "stun_1": defender['stunned'] = True
 
-    # 6. DEATH & REWARDS LOGIC (Ultra-Fast Cache Updates)
+    # 6. DEATH & REWARDS LOGIC
     if defender['hp'] <= 0:
         defender['hp'] = 0
         b[f'{def_p}_idx'] += 1
@@ -1127,45 +1125,55 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
         if b[f'{def_p}_idx'] >= len(b[f'{def_p}_team']):
             winner_name = b['p1_name'] if def_p == "p2" else b['p2_name']
             loser_name = b['p2_name'] if def_p == "p2" else b['p1_name']
+            rank_up_msg = ""
 
-            # Process Rewards using RAM Cache
             if b.get('is_npc'):
-                uid = b['p1_id']
+                uid = str(b['p1_id'])
                 if uid in pending_explores: del pending_explores[uid]
-                p = get_player(uid) # Instant RAM lookup
+                p = get_player(uid)
                 
                 exp_gain = random.randint(50, 100)
                 berry_gain = random.randint(50, 100)
+                bounty_gain = random.randint(20, 30)
                 
                 p['explore_wins'] += 1
                 p['exp'] += exp_gain
                 p['berries'] += berry_gain
+                p['bounty'] += bounty_gain
                 
-                check_player_levelup(p)
-                save_player(uid, p) # Instant RAM update + Background DB Write
+                # Update character-specific exp
+                for team_char in b['p1_team']:
+                    for main_char in p['characters']:
+                        if main_char['name'] == team_char['name']:
+                            main_char['exp'] = main_char.get('exp', 0) + exp_gain
+                            check_char_levelup(main_char)
 
-                final_ui = f"🏆 **{winner_name}** Wins!\n🌟 EXP: +{exp_gain}\n🍇 Berries: +{berry_gain}"
+                lvls = check_player_levelup(p)
+                if lvls > 0: rank_up_msg = f"\n\n💫 Rank up to {p['level']}!"
+                save_player(uid, p)
+
+                final_ui = f"🏆 **{winner_name}** Wins!\n🌟 EXP: +{exp_gain}\n🍇 Berries: +{berry_gain}\n฿ Bounty: +{bounty_gain}{rank_up_msg}"
             else:
-                # PvP Reward logic
                 wp_id = b['p1_id'] if def_p == "p2" else b['p2_id']
-                wp = get_player(wp_id)
-                wp['wins'] += 1
+                wp = get_player(wp_id); wp['wins'] += 1
                 save_player(wp_id, wp)
                 final_ui = f"🏆 **{winner_name}** triumphed in PvP!"
 
-            await query.edit_message_text(final_ui, parse_mode="Markdown")
+            # FIX: Use caption edit for photo messages to avoid "no text to edit" error
             if battle_id in battles: del battles[battle_id]
+            try:
+                await query.edit_message_caption(caption=final_ui, parse_mode="Markdown")
+            except Exception:
+                await query.message.reply_text(final_ui, parse_mode="Markdown")
             return
 
     # 7. TURN ROTATION
     b['turn_owner'] = def_p
     await show_move_selection(query, battle_id, log, context)
     
-    # Auto-trigger NPC turn if applicable
     if b.get('is_npc') and b['turn_owner'] == "p2":
         await asyncio.sleep(0.5) 
         await run_battle_turn(query, battle_id, move_name=None, context=context)
-
 
 async def show_move_selection(query, battle_id, log="", context=None):
     b = battles.get(battle_id)
