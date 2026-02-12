@@ -2032,6 +2032,12 @@ async def unstuck_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
+async def auto_detector_job(context: ContextTypes.DEFAULT_TYPE):
+    current_time = time.time()
+    for uid, p in player_cache.items():
+        last_act = p.get('last_interaction', 0)
+        if (current_time - last_act < 300) and not p.get('is_locked') and not p.get('verification_active'):
+            await trigger_security_check(uid, context)
 
 async def get_file_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fid = update.message.photo[-1].file_id if update.message.photo else (update.message.video.file_id if update.message.video else None)
