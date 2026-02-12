@@ -1116,7 +1116,7 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
                     char['atk_max'] = int(char['atk_max'] * 1.05)
             elif effect == "stun_1": defender['stunned'] = True
 
-    # 6. DEATH & REWARDS LOGIC
+    # 6. DEATH & REWARDS LOGIC (Ultra-Fast Cache Updates)
     if defender['hp'] <= 0:
         defender['hp'] = 0
         b[f'{def_p}_idx'] += 1
@@ -1130,43 +1130,66 @@ async def run_battle_turn(query, battle_id, move_name=None, context=None):
             if b.get('is_npc'):
                 uid = str(b['p1_id'])
                 if uid in pending_explores: del pending_explores[uid]
-                p = get_player(uid)
+                p = get_player(uid) # Instant RAM lookup
                 
-                exp_gain = random.randint(50, 100)
-                berry_gain = random.randint(50, 100)
-                bounty_gain = random.randint(20, 30)
+                # UPDATED LOOT TABLE: Adding Clovers to standard fights
+                wins_at = p.get('explore_wins', 0)
+                if wins_at in BOSS_MISSIONS:
+                    exp_gain = random.randint(200, 300)
+                    berry_gain = random.randint(200, 250)
+                    clover_gain = random.randint(5, 10)
+                    bounty_gain = random.randint(100, 200)
+                else:
+                    exp_gain = random.randint(50, 100)
+                    berry_gain = random.randint(50, 100)
+                    clover_gain = random.randint(1, 3) # Added Clovers here
+                    bounty_gain = random.randint(20, 30)
                 
                 p['explore_wins'] += 1
                 p['exp'] += exp_gain
                 p['berries'] += berry_gain
+                p['clovers'] += clover_gain
                 p['bounty'] += bounty_gain
                 
                 # Update character-specific exp
                 for team_char in b['p1_team']:
-                    for main_char in p['characters']:
+                    for main_char in p.get('characters', []):
                         if main_char['name'] == team_char['name']:
                             main_char['exp'] = main_char.get('exp', 0) + exp_gain
                             check_char_levelup(main_char)
 
                 lvls = check_player_levelup(p)
-                if lvls > 0: rank_up_msg = f"\n\n💫 Rank up to {p['level']}!"
-                save_player(uid, p)
+                if lvls > 0: rank_up_msg = f"\n\n💫 Rank increased to {p['level']}!"
+                
+                save_player(uid, p) # Instant RAM update
 
-                final_ui = f"🏆 **{winner_name}** Wins!\n🌟 EXP: +{exp_gain}\n🍇 Berries: +{berry_gain}\n฿ Bounty: +{bounty_gain}{rank_up_msg}"
+                final_ui = (
+                    f"◈☰☰☰⚔️ ＢＡＴＴＬＥ ＲＥＳＵＬＴ ⚔️☰☰☰◈\n\n"
+                    f"🏆 **{winner_name}** defeated **{loser_name}**!\n\n"
+                    f"🌟 EXP: +{exp_gain}\n"
+                    f"🍇 Berries: +{berry_gain}\n"
+                    f"🍀 Clovers: +{clover_gain}\n"
+                    f"฿ Bounty: +{bounty_gain}{rank_up_msg}"
+                )
             else:
+                # PvP Reward logic
                 wp_id = b['p1_id'] if def_p == "p2" else b['p2_id']
-                wp = get_player(wp_id); wp['wins'] += 1
+                wp = get_player(wp_id)
+                wp['wins'] += 1
                 save_player(wp_id, wp)
                 final_ui = f"🏆 **{winner_name}** triumphed in PvP!"
 
-            # FIX: Use caption edit for photo messages to avoid "no text to edit" error
+            # CLEANUP: Remove battle from memory
             if battle_id in battles: del battles[battle_id]
+
+            # [span_0](start_span)FIX: Use edit_message_caption to prevent 'no text to edit' error[span_0](end_span)
             try:
                 await query.edit_message_caption(caption=final_ui, parse_mode="Markdown")
             except Exception:
-                await query.message.reply_text(final_ui, parse_mode="Markdown")
+                try: await query.edit_message_text(final_ui, parse_mode="Markdown")
+                except: await query.message.reply_text(final_ui)
             return
-
+            
     # 7. TURN ROTATION
     b['turn_owner'] = def_p
     await show_move_selection(query, battle_id, log, context)
