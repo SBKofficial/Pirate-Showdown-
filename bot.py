@@ -1288,7 +1288,7 @@ async def main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     spamming, wait_time = await is_spamming(uid, 3)
     if spamming:
-        await query.answer(f"⏳ Slow down! Wait {wait_time}s...", show_alert=False)
+        await query.answer(f"⏳ Slow down! Wait {wait_time}s...", show_alert=True)
         return
     # Check Registration for interaction
     if not load_player(uid) and not data.startswith("choose_") and not data.startswith("start_"):
