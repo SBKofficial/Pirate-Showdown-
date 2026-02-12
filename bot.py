@@ -1495,10 +1495,11 @@ async def handle_wheel(query, p, count, wheel_type):
         cost = 100 if count == 1 else 400
 
     if p.get("clovers", 0) < cost:
-        await query.answer("Not enough 🍀 Clovers!", show_alert=True); return
+        await query.answer("Not enough 🍀 Clovers!", show_alert=True)
+        return
 
     p["clovers"] -= cost
-    save_player(uid, p)
+    save_player(uid, p) # Instant RAM update
 
     results = []
     special_anim = None
@@ -1517,29 +1518,43 @@ async def handle_wheel(query, p, count, wheel_type):
                 res = random.choice(others)
 
             char_data = CHARACTERS[res]
-            rarity_prefix = "🟦 " if "Rare" in char_data['rarity'] else "⬜️ " if "Common" in char_data['rarity'] else "🟨 "
+            # Use symbol only from your RARITY_STYLES
+            rarity = char_data.get('rarity', 'Common')
+            symbol = RARITY_STYLES.get(rarity, {}).get("symbol", "🔘")
 
             existing = next((c for c in p["characters"] if c["name"] == res), None)
             if existing:
                 existing["level"] = existing.get("level", 1) + 1
-                results.append(f"{rarity_prefix}{res} (Lv.{existing['level']})")
+                results.append(f"• {res} {symbol} (Lv.{existing['level']})")
             else:
                 p["characters"].append(generate_char_instance(res))
-                results.append(f"{rarity_prefix}{res} (New!)")
+                results.append(f"• {res} {symbol} (New!)")
     else:
         for _ in range(count):
             roll = random.random()
             if roll < 0.05:
                 fruit_name = random.choice(list(DEVIL_FRUITS.keys()))
-                p.setdefault("fruits", []).append(fruit_name); results.append(f"🍎 {fruit_name} (NEW!)")
-            elif roll < 0.15: clovers = random.randint(10, 50); p['clovers'] += clovers; results.append(f"🍀 {clovers} Clovers")
-            else: berries = random.randint(5000, 15000); p['berries'] += berries; results.append(f"🍇 {berries} Berries")
+                p.setdefault("fruits", []).append(fruit_name)
+                results.append(f"🍎 {fruit_name} (NEW!)")
+            elif roll < 0.15:
+                clovers = random.randint(10, 50)
+                p['clovers'] += clovers
+                results.append(f"🍀 {clovers} Clovers")
+            else:
+                berries = random.randint(5000, 15000)
+                p['berries'] += berries
+                results.append(f"🍇 {berries} Berries")
 
-    save_player(uid, p)
+    save_player(uid, p) # Background cloud save
     res_text = f"🎰 **{wheel_type.upper()} RESULTS**:\n\n" + "\n".join(results)
 
     final_anim = special_anim if special_anim else SUMMON_ANIMATION
-    await query.edit_message_media(InputMediaVideo(final_anim, caption=res_text), reply_markup=None)
+    try:
+        await query.edit_message_media(InputMediaVideo(final_anim, caption=res_text, parse_mode="Markdown"), reply_markup=None)
+    except Exception:
+        # Fallback for images or if video fails
+        await query.message.reply_text(res_text, parse_mode="Markdown")
+
 
 # =====================
 # INSPECT & FRUIT
