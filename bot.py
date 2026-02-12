@@ -526,28 +526,50 @@ async def is_spamming(user_id, cooldown_seconds=3):
 async def trigger_security_check(user_id, context):
     p = get_player(user_id)
     riddle = random.choice(RIDDLES)
+    
+    # 1. Update State First
     p['verification_active'] = True
+    save_player(user_id, p) # Save immediately so they can't dodge by restarting app
     
     # Randomize button order
-    random.shuffle(riddle['options'])
+    options = riddle['options'].copy()
+    random.shuffle(options)
     
     keyboard = []
-    for opt in riddle['options']:
+    for opt in options:
         # Data format: verify:is_correct:user_id
         is_correct = "1" if opt == riddle['correct'] else "0"
         keyboard.append(InlineKeyboardButton(opt, callback_data=f"v:{is_correct}:{user_id}"))
 
+    # FIXED: Use single * for bold in standard Markdown
     text = (
-        f"⚠️ **MARINE SECURITY CHECK!**\n"
+        f"⚠️ *MARINE SECURITY CHECK!*\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Identify **{riddle['hint']}** within 15 seconds!\n"
+        f"Identify *{riddle['hint']}* within 15 seconds!\n"
         f"━━━━━━━━━━━━━━━━━━━"
     )
     
-    msg = await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup([keyboard]), parse_mode="Markdown")
-    
-    # Auto-lock after 15 seconds if still active
-    context.job_queue.run_once(security_timeout, 15, data={'user_id': user_id, 'msg_id': msg.message_id})
+    try:
+        msg = await context.bot.send_message(
+            chat_id=user_id, 
+            text=text, 
+            reply_markup=InlineKeyboardMarkup([keyboard]), 
+            parse_mode="Markdown"
+        )
+        
+        # Auto-lock after 15 seconds if still active
+        context.job_queue.run_once(
+            security_timeout, 
+            15, 
+            data={'user_id': user_id, 'msg_id': msg.message_id}
+        )
+        
+    except Exception as e:
+        # If user blocked bot, reset their verify status so they don't get stuck
+        p['verification_active'] = False
+        save_player(user_id, p)
+        logging.warning(f"Could not send security check to {user_id}: {e}")
+
 
 async def security_timeout(context: ContextTypes.DEFAULT_TYPE):
     job_data = context.job.data
@@ -2043,10 +2065,19 @@ async def unstuck_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def auto_detector_job(context: ContextTypes.DEFAULT_TYPE):
     current_time = time.time()
-    for uid, p in player_cache.items():
+    
+    # Iterate through a copy of items to avoid runtime errors if dict changes
+    for uid, p in list(player_cache.items()):
         last_act = p.get('last_interaction', 0)
+        
+        # Check: Active in last 5 mins (300s) AND not already locked/verifying
         if (current_time - last_act < 300) and not p.get('is_locked') and not p.get('verification_active'):
-            await trigger_security_check(uid, context)
+            try:
+                await trigger_security_check(uid, context)
+                # Small sleep to prevent hitting Telegram Flood Limits
+                await asyncio.sleep(0.1) 
+            except Exception as e:
+                logging.error(f"Security check failed for {uid}: {e}")
 
 async def get_file_ids(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fid = update.message.photo[-1].file_id if update.message.photo else (update.message.video.file_id if update.message.video else None)
