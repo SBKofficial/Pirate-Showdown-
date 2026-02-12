@@ -1661,24 +1661,35 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_photo(IMAGE_URLS.get(name, IMAGE_URLS["Default"]), caption=get_stats_text(char_obj, p.get('equipped_fruit')))
 
 async def mycollection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Check Registration
-    if not load_player(update.effective_user.id):
+    user_id = update.effective_user.id
+    
+    # Instant RAM Lookup
+    p = get_player(user_id)
+    if not p:
         await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
         return
 
-    p = get_player(update.effective_user.id)
     txt = "📜 **YOUR PIRATE FLEET** 📜\n━━━━━━━━━━━━━━━━━━━\n\n"
+    
     if not p.get('characters'):
         txt += "_No pirates recruited yet._"
     else:
         for c in p['characters']:
-            char_data = CHARACTERS.get(c['name'], {})
-            rarity = char_data.get('rarity', '⬜️')
+            name = c['name']
+            lvl = c.get('level', 1)
+            
+            # Get rarity from master data and map to symbol
+            char_master = CHARACTERS.get(name, {})
+            rarity_type = char_master.get('rarity', 'Common')
+            symbol = RARITY_STYLES.get(rarity_type, {}).get("symbol", "🔘")
+            
             wep = f" | ⚔️ {c['equipped_weapon']}" if c.get('equipped_weapon') else ""
-            txt += f"{rarity} **{c['name']}** (Lv.{c.get('level', 1)}){wep}\n"
+            
+            # Format: Name Symbol (Lv.X)
+            txt += f"• **{name}** {symbol} (Lv.{lvl}){wep}\n"
 
-    txt += "\n━━━━━━━━━━━━━━━━━━━\n_View fruits and weapons in your /inventory_"
     await update.message.reply_text(txt, parse_mode="Markdown")
+
 
 async def sendberry_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check Registration
