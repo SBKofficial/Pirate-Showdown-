@@ -65,9 +65,19 @@ except Exception as e:
 def init_db():
     if mongo_client:
         try:
+            # Verify connection
             mongo_client.admin.command('ping')
+            
+            # Select the database and collection
+            db = mongo_client["pirate_v3"]
+            
+            # Create a UNIQUE INDEX on user_id
+            # This makes player lookups nearly instant
+            db["players"].create_index("user_id", unique=True)
+            print("✅ Database indexed and ready.")
+            
         except Exception as e:
-            print(f"Database connection warning: {e}")
+            print(f"❌ Database initialization error: {e}")
 
 def save_player(user_id, player_data):
     if players_collection is None: return
