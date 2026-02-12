@@ -2065,6 +2065,9 @@ async def post_init(application):
 # =====================
 
 if __name__ == "__main__":
+
+TOKEN = os.getenv("BOT_TOKEN")
+
     if not TOKEN:
         print("❌ Error: BOT_TOKEN is missing!")
         exit(1)
