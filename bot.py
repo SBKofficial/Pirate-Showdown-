@@ -571,7 +571,7 @@ async def security_timeout(context: ContextTypes.DEFAULT_TYPE):
             
             # Notify your Log Group
             await context.bot.send_message(
-                chat_id="-5178096636",
+                chat_id="-1003855697962",
                 text=f"🚨 **BOT DETECTION (TIMEOUT)**\n👤: `{p.get('name')}`\n🆔: `{uid}`\n👉 `/unlock {uid}`",
                 parse_mode="Markdown"
             )
@@ -1468,7 +1468,7 @@ async def main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("🚫 **ACCOUNT LOCKED.**\nContact owner to prove your identity.")
             
             await context.bot.send_message(
-                chat_id="-5178096636",
+                chat_id="-1003855697962",
                 text=f"🚨 **BOT ALERT**\n👤: `{p.get('name')}`\n🆔: `{uid}`\n❌: Failed Emoji\n👉 `/unlock {uid}`",
                 parse_mode="Markdown"
             )
