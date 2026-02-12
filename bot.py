@@ -43,7 +43,7 @@ RIDDLES = [
     {"hint": "what you need to steer the ship ☸️", "correct": "☸️", "options": ["🛶", "⚓️", "☸️"]},
     {"hint": "the Jolly Roger 🏴‍☠️", "correct": "🏴‍☠️", "options": ["🚩", "🏳️", "🏴‍☠️"]}
 ]
-
+ADMIN_IDS = [5242138546 , 7708811819]
 # =====================
 # LOGGING SETUP
 # =====================
