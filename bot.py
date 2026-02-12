@@ -673,46 +673,52 @@ async def show_starter_page(update, name, target_user_id):
     except Exception: pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+    user_id = str(update.effective_user.id) # Ensure ID is a string for DB consistency
+    username = update.effective_user.first_name or "Pirate"
     
-    # Check if exists first to welcome back, or create if new
-    existing_player = load_player(user_id)
-    p = get_player(user_id, update.effective_user.first_name)
+    # 1. Fetch player only once to reduce DB hits
+    p = load_player(user_id)
+    is_new = False
 
-    # UPDATED: Referral Logic
-    if context.args and not existing_player and not p.get('referred_by'):
+    if not p:
+        is_new = True
+        p = get_player(user_id, username) # This creates the default dict
+
+    # 2. Optimized Referral Logic (Only runs for brand new users)
+    if is_new and context.args:
         try:
             referrer_id = str(context.args[0])
-            if referrer_id != str(user_id):
+            if referrer_id != user_id:
                 referrer = load_player(referrer_id)
                 if referrer:
-                    # Link users
                     p['referred_by'] = referrer_id
+                    p['berries'] += 5000
+                    p['clovers'] += 50
 
-                    # Reward New User
-                    p['berries'] = p.get('berries', 0) + 5000
-                    p['clovers'] = p.get('clovers', 0) + 50
-
-                    # Reward Referrer
-                    referrer['berries'] = referrer.get('berries', 0) + 10000
-                    referrer['clovers'] = referrer.get('clovers', 0) + 100
+                    referrer['berries'] += 10000
+                    referrer['clovers'] += 100
                     referrer['referrals'] = referrer.get('referrals', 0) + 1
-
-                    save_player(user_id, p)
+                    
+                    # Save both in one go
                     save_player(referrer_id, referrer)
-
-                    await update.message.reply_text(f"🤝 You were referred by {referrer['name']}! You received 5,000 🍇 and 50 🍀.")
+                    # p will be saved at the end of this function
+                    
+                    await update.message.reply_text(f"🤝 Referred by {referrer['name']}! Bonus added.")
                     try:
-                        await context.bot.send_message(chat_id=referrer_id, text=f"🤝 {p['name']} joined via your link! You received 10,000 🍇 and 100 🍀.")
+                        await context.bot.send_message(chat_id=referrer_id, text=f"🤝 {p['name']} joined! +10,000 🍇")
                     except: pass
-        except Exception: pass
+        except Exception as e:
+            logging.error(f"Referral Error: {e}")
+
+    # 3. Final Save and Navigation
+    save_player(user_id, p)
 
     if p.get("starter_summoned"):
         await update.message.reply_text(f"Welcome back Captain {p['name']}!")
         return
 
-    # Pass user_id to lock the selection
     await show_starter_page(update, "Usopp", user_id)
+
 
 async def referral_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
