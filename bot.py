@@ -2016,21 +2016,30 @@ async def unstuck_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # 2. State Reset
-    # Resetting the 'last_interaction' or cooldown timestamps
     p['last_interaction'] = 0 
-    p['verification_active'] = False # Just in case a message was deleted
+    p['verification_active'] = False
     
-    # Save changes to RAM and DB
+    # 3. THE FIX: Clear the exploration/battle lock
+    if uid in pending_explores:
+        del pending_explores[uid]
+    
+    # Optional: Clear active battle session if it exists
+    for bid in list(battles.keys()):
+        if uid in bid:
+            del battles[bid]
+    
+    # Save changes
     save_player(uid, p)
     
-    await update.message.reply_text("🛠 **System Reset!** Your session has been unstuck. You may continue.")
+    await update.message.reply_text("🛠 **System Reset!** Your session and battle timers have been unstuck.")
     
-    # Optional: Log to your Admin Group
+    # Admin Log
     await context.bot.send_message(
-        chat_id="-5178096636",
-        text=f"🛠 **UNSTUCK:** User `{p.get('name')}` (`{uid}`) reset their state.",
+        chat_id="-1003855697962",
+        text=f"🛠 **UNSTUCK:** User `{p.get('name', 'Unknown')}` (`{uid}`) reset their state.",
         parse_mode="Markdown"
     )
+
 
 async def auto_detector_job(context: ContextTypes.DEFAULT_TYPE):
     current_time = time.time()
