@@ -1175,8 +1175,10 @@ async def show_move_selection(query, battle_id, log="", context=None):
     p1_char = b['p1_team'][b['p1_idx']]; p2_char = b['p2_team'][b['p2_idx']]
     attacker = b[b['turn_owner'] + '_team'][b[b['turn_owner'] + '_idx']]
 
-    move1, move2 = attacker['moves'][0], attacker['moves'][1]
-    spec_move = attacker['moves'][2] if len(attacker['moves']) > 2 else None
+    # Simplified to only take the first move
+    basic_move = attacker['moves'][0]
+    # Check if a weapon special move exists (it would be at index 2 or 1 depending on list length)
+    spec_move = attacker['moves'][2] if len(attacker['moves']) > 2 else (attacker['moves'][1] if len(attacker['moves']) > 1 else None)
 
     ult_name = attacker['ult']
     ult_desc = EFFECT_DESCRIPTIONS.get(attacker['name'], "Standard massive damage.")
@@ -1188,28 +1190,33 @@ async def show_move_selection(query, battle_id, log="", context=None):
         f"👤 **{b['p2_name'].upper()} - {p2_char['name']}**: {p2_char['hp']}/{p2_char['max_hp']}\n"
         f"`{get_bar(p2_char['hp'], p2_char['max_hp'])}`\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"⚡️ **{attacker['name'].upper()}'S MOVES** ⚡️\n"
-        f"1️⃣ {move1}\n"
-        f"2️⃣ {move2}\n"
+        f"⚡️ **{attacker['name'].upper()}'S TURN** ⚡️\n"
+        f"👊 **BASIC**: {basic_move}\n"
     )
+    
     if spec_move:
         status += f"⚔️ **SPECIAL**: {spec_move}\n"
 
     status += (
         f"🌟 **ULTIMATE**: {ult_name}\n"
         f"└─ *{ult_desc}*\n"
-        f"━━━━━━━━━━━━━━━━━━\n{log if log else 'Battle Started!'}\n"
+        f"━━━━━━━━━━━━━━━━━━\n{log if log else 'Waiting for your move...'}\n"
         f"━━━━━━━━━━━━━━━━━━\n⌛️ TURN: **{b[b['turn_owner'] + '_name']}**"
     )
 
+    # Simplified Keyboard: One row for Basic, one for Special (if exists), one for Ult
     kb = [
-        [InlineKeyboardButton(f"👊 {move1}", callback_data=f"bmove|{battle_id}|{move1}"), InlineKeyboardButton(f"👊 {move2}", callback_data=f"bmove|{battle_id}|{move2}")],
+        [InlineKeyboardButton(f"👊 {basic_move}", callback_data=f"bmove|{battle_id}|{basic_move}")]
     ]
+    
     if spec_move:
         kb.append([InlineKeyboardButton(f"⚔️ {spec_move}", callback_data=f"bmove|{battle_id}|{spec_move}")])
 
-    kb.append([InlineKeyboardButton(f"🌟 ULTIMATE: {ult_name} 🌟" if not attacker.get('ult_used') else "🚫 ULTIMATE DEPLETED", callback_data=f"bmove|{battle_id}|{ult_name}" if not attacker.get('ult_used') else "none")])
-    kb.append([InlineKeyboardButton("🏃 Run", callback_data=f"brun_{battle_id}"), InlineKeyboardButton("🏳 Forfeit", callback_data=f"bforfeit_{battle_id}")])
+    kb.append([InlineKeyboardButton(f"🌟 ULTIMATE: {ult_name} 🌟" if not attacker.get('ult_used') else "🚫 ULTIMATE DEPLETED", 
+                                  callback_data=f"bmove|{battle_id}|{ult_name}" if not attacker.get('ult_used') else "none")])
+    
+    kb.append([InlineKeyboardButton("🏃 Run", callback_data=f"brun_{battle_id}"), 
+               InlineKeyboardButton("🏳 Forfeit", callback_data=f"bforfeit_{battle_id}")])
 
     try:
         msg = await query.edit_message_text(status, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
