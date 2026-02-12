@@ -156,7 +156,6 @@ init_db()
 # CONSTANTS & STATS
 # =====================
 
-ADMIN_IDS = [5242138546]
 WHEEL_VIDEO = "BAACAgUAAyEFAATl0UgqAAIeZWmFStczJlfo5LnlJVRzeWuUtoSLAAJtIAACMx4pVKMk-1-9BG_3OAQ"
 YAMATO_ULT_VIDEO = "BAACAgUAAxkBAAIr1WmAKRpP7UEXoxx58xwDRtc65mzSAALQGQACW_z5V441GyK7BGOqOAQ"
 KID_ULT_VIDEO = "BAACAgUAAxkBAAIuemmCBZpyHB8s96nGwTuTrPhrqeDlAAKYIwACukcJVL9MKAIltY9HOAQ"
@@ -602,41 +601,50 @@ async def security_timeout(context: ContextTypes.DEFAULT_TYPE):
             logging.error(f"Timeout logic failed for {uid}: {e}")
 
 async def unlock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Security Check: Only allow Admins to use this
+    # 1. Security Check: Only allow Admins
     user_id = update.effective_user.id
     if user_id not in ADMIN_IDS:
         await update.message.reply_text("🚫 Access Denied: Admins only.")
         return
 
-    # 2. Argument Check: Did they provide a User ID?
+    # 2. Argument Check
     if not context.args:
-        await update.message.reply_text("⚠️ Usage: `/unlock <user_id>`")
+        await update.message.reply_text("⚠️ Usage: `/unlock ID1 ID2 ...`")
         return
 
-    try:
-        target_id = str(context.args[0])
-        p = load_player(target_id)
-        
-        if not p:
-            await update.message.reply_text("⚠️ Player not found.")
-            return
-
-        # 3. The Unlock Logic
-        p['is_locked'] = False
-        p['verification_active'] = False
-        p['last_interaction'] = 0 # Reset timer so they don't get checked instantly
-        save_player(target_id, p)
-        
-        # 4. Success Messages
-        await update.message.reply_text(f"✅ User `{p['name']}` ({target_id}) has been UNLOCKED.")
-        
+    # 3. Loop through ALL provided IDs
+    results = []
+    
+    for target_id in context.args:
         try:
-            await context.bot.send_message(chat_id=target_id, text="🔓 **Account Unlocked!**\nThe Marine Security lock has been lifted. You may continue.")
-        except:
-            await update.message.reply_text("⚠️ User unlocked, but could not DM them (they might have blocked the bot).")
+            # Clean ID (remove commas if typed like "123, 456")
+            clean_id = str(target_id).replace(",", "").strip()
+            p = load_player(clean_id)
+            
+            if not p:
+                results.append(f"⚠️ `{clean_id}`: Not found")
+                continue
 
-    except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+            # The Unlock Logic
+            p['is_locked'] = False
+            p['verification_active'] = False
+            p['last_interaction'] = 0 
+            save_player(clean_id, p)
+            
+            results.append(f"✅ `{p['name']}`: Unlocked")
+            
+            # Try to DM the user
+            try:
+                await context.bot.send_message(chat_id=clean_id, text="🔓 **Account Unlocked!**\nYou may continue sailing.")
+            except:
+                pass # Ignore if user blocked bot
+
+        except Exception as e:
+            results.append(f"❌ `{target_id}`: Error ({e})")
+
+    # 4. Send Summary Report
+    await update.message.reply_text("\n".join(results), parse_mode="Markdown")
+
 
 def get_player(user_id, username=None):
     uid = str(user_id)
