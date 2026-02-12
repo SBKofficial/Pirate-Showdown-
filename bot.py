@@ -4,10 +4,14 @@ import asyncio
 import json
 import os
 import time
+import logging
 from datetime import datetime
-# REMOVED sqlite3, ADDED pymongo
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 from pymongo import MongoClient
-# Added HTTPXRequest for connection handling
 from telegram.request import HTTPXRequest
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand, InputMediaPhoto, InputMediaVideo
 from telegram.ext import (
@@ -20,19 +24,25 @@ from telegram.ext import (
 )
 
 # =====================
+# LOGGING SETUP
+# =====================
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+# =====================
 # DATA PERSISTENCE (MONGODB ATLAS)
 # =====================
 
-# UPDATED: MongoDB Connection String
-# SECURITY EDIT: Loads from Environment Variable to allow safe GitHub upload.
 MONGO_URI = os.getenv("MONGO_URI")
 
 # Initialize Client
 try:
-    # If MONGO_URI is None (not set), MongoClient might raise an error or connect to localhost.
-    # We check if it is set in the main block at the bottom, but here we try to initialize.
     if MONGO_URI:
         mongo_client = MongoClient(MONGO_URI)
+        # Verify connection immediately
+        mongo_client.admin.command('ping')
         db = mongo_client["pirate_v3"]
         players_collection = db["players"]
         print("✅ Connected to MongoDB Atlas successfully.")
@@ -42,9 +52,10 @@ try:
         players_collection = None
 except Exception as e:
     print(f"❌ Failed to connect to MongoDB: {e}")
+    mongo_client = None
+    players_collection = None
 
 def init_db():
-    # MongoDB creates collections lazily, so we just verify connection here
     if mongo_client:
         try:
             mongo_client.admin.command('ping')
@@ -55,7 +66,9 @@ def save_player(user_id, player_data):
     if players_collection is None: return
     try:
         player_data['user_id'] = str(user_id)
-        # Upsert: Update if exists, Insert if not
+        # Remove _id if present to avoid immutable field error on update
+        if '_id' in player_data:
+            del player_data['_id']
         players_collection.update_one(
             {"user_id": str(user_id)},
             {"$set": player_data},
@@ -67,10 +80,7 @@ def save_player(user_id, player_data):
 def load_player(user_id):
     if players_collection is None: return None
     try:
-        # Find one document by user_id
         data = players_collection.find_one({"user_id": str(user_id)})
-        # MongoDB returns the dict directly, no need for json.loads unless stored as string
-        # We also remove the internal '_id' field before returning to keep logic consistent
         if data:
             if '_id' in data:
                 del data['_id']
@@ -538,6 +548,11 @@ async def explore_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ This command can only be used in private messages (DM).")
         return
 
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     p = get_player(update.effective_user.id)
     uid = str(p['user_id'])
 
@@ -652,10 +667,13 @@ async def show_starter_page(update, name, target_user_id):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
+    # Check if exists first to welcome back, or create if new
+    existing_player = load_player(user_id)
     p = get_player(user_id, update.effective_user.first_name)
 
     # UPDATED: Referral Logic
-    if context.args and not p.get('referred_by'):
+    if context.args and not existing_player and not p.get('referred_by'):
         try:
             referrer_id = str(context.args[0])
             if referrer_id != str(user_id):
@@ -712,6 +730,11 @@ async def store_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ This command can only be used in private messages (DM).")
         return
 
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     text = "⚓️ **PIRATE STORE** ⚓️\n\nWelcome to the black market. Select a category to browse items."
     kb = [
         [InlineKeyboardButton("Weapons ⚔️", callback_data="store_weapons"), InlineKeyboardButton("Fruits 🍎", callback_data="store_fruits")],
@@ -737,6 +760,11 @@ async def handle_store_callback(query, category):
 async def buy_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: `/buy Item Name`")
+        return
+
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
         return
 
     input_item = " ".join(context.args).lower().strip()
@@ -785,6 +813,11 @@ async def buy_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def use_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: `/use Item Name`")
+        return
+
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
         return
 
     input_name = " ".join(context.args).lower().strip()
@@ -843,6 +876,11 @@ async def myteam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ This command can only be used in private messages (DM).")
         return
 
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     p = get_player(update.effective_user.id)
     team_names = ", ".join([c['name'] for c in p.get('team', [])]) or "None"
     txt = f"⚓️ YOUR TEAM ⚓️\n\nActive: {team_names}\n\nSelect up to 3 pirates for battle."
@@ -898,9 +936,20 @@ async def battle_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Reply to someone to challenge them!")
         return
+
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     p1_id = str(update.effective_user.id)
     p2_id = str(update.message.reply_to_message.from_user.id)
     if p1_id == p2_id: return
+
+    # Check Registration for Opponent
+    if not load_player(p2_id):
+        await update.message.reply_text("⚠️ Your opponent hasn't started their journey yet!")
+        return
 
     # Check if either player is already in battle
     for b in battles.values():
@@ -1172,6 +1221,12 @@ async def main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     uid = str(query.from_user.id)
+    
+    # Check Registration for interaction
+    if not load_player(uid) and not data.startswith("choose_") and not data.startswith("start_"):
+        await query.answer("⚠️ You must start your journey first! Use /start.", show_alert=True)
+        return
+
     p = get_player(uid)
 
     if data == "none":
@@ -1365,6 +1420,11 @@ async def main_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =====================
 
 async def wheel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     desc = "🎡 **PIRATE WHEELS** 🎡\n\nChoose the wheel you want to spin!"
     kb = [[InlineKeyboardButton("Character Wheel 👤", callback_data="char_wheel")], [InlineKeyboardButton("Resource Wheel 💎", callback_data="res_wheel")]]
     await update.message.reply_video(WHEEL_VIDEO, caption=desc, reply_markup=InlineKeyboardMarkup(kb))
@@ -1444,6 +1504,11 @@ async def inspect_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: `/inspect [Name]`")
         return
 
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     name = " ".join(context.args).title()
     p = get_player(update.effective_user.id)
 
@@ -1481,6 +1546,11 @@ async def inspect_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =====================
 
 async def myprofile_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     user_id = update.effective_user.id; p = get_player(user_id, update.effective_user.first_name)
     lvl = p.get('level', 1); exp = p.get('exp', 0); req = get_required_player_exp(lvl)
     wins = p.get('wins', 0); losses = p.get('losses', 0); total = wins + losses
@@ -1495,6 +1565,15 @@ async def myprofile_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def inventory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE, is_cb=False):
     uid = update.effective_user.id if not is_cb else update.callback_query.from_user.id
+    
+    # Check Registration
+    if not load_player(uid):
+        if is_cb:
+            await update.callback_query.answer("⚠️ You must start your journey first!", show_alert=True)
+        else:
+            await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     p = get_player(uid)
     lvl = p.get('level', 1); exp = p.get('exp', 0); req = get_required_player_exp(lvl)
     inv = f"╭━━━━━━━━━━━━━━━╮\n✦    📦 INVENTORY 📦     ✦\n╰━━━━━━━━━━━━━━━╯\n\nɴᴀᴍᴇ 📛: {p['name']}\nDevil fruit🪻: {p.get('equipped_fruit') or 'None'}\n━━━━━━━━━━━━━━━━━━━\nBerry🍇: {p.get('berries', 0):,}\nClover🍀: {p.get('clovers', 0):,}\n━━━━━━━━━━━━━━━━━━━\n\n━━━━━━━━━━━━━━━━━━━\nʟᴇᴠᴇʟ ⭐️: {lvl}\nᴇxᴘ 📈: {exp}/{req}\nʟᴠʟ ᴜᴘ ᴛᴏᴋᴇɴ 🧩: {p.get('tokens', 0)}\nᴋɪʟʟ ᴄᴏᴜɴᴛ 🩸: {p.get('kill_count', 0)}\n"
@@ -1506,6 +1585,11 @@ async def inventory_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE, is_c
         await update.message.reply_photo(INVENTORY_IMAGE, caption=inv, reply_markup=InlineKeyboardMarkup(kb))
 
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     p = get_player(update.effective_user.id)
     if not context.args: return
     name = " ".join(context.args).title()
@@ -1516,6 +1600,11 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_photo(IMAGE_URLS.get(name, IMAGE_URLS["Default"]), caption=get_stats_text(char_obj, p.get('equipped_fruit')))
 
 async def mycollection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     p = get_player(update.effective_user.id)
     txt = "📜 **YOUR PIRATE FLEET** 📜\n━━━━━━━━━━━━━━━━━━━\n\n"
     if not p.get('characters'):
@@ -1531,6 +1620,11 @@ async def mycollection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(txt, parse_mode="Markdown")
 
 async def sendberry_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     if not update.message.reply_to_message or not context.args: return
     try:
         amount = int(context.args[0]); sender_id = update.effective_user.id; receiver_id = update.message.reply_to_message.from_user.id; sender = get_player(sender_id)
@@ -1540,6 +1634,11 @@ async def sendberry_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except: pass
 
 async def sendclovers_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check Registration
+    if not load_player(update.effective_user.id):
+        await update.message.reply_text("⚠️ You must start your journey first! Use /start.")
+        return
+
     if not update.message.reply_to_message or not context.args: return
     try:
         amount = int(context.args[0]); sender_id = update.effective_user.id; receiver_id = update.message.reply_to_message.from_user.id; sender = get_player(sender_id)
@@ -1572,10 +1671,10 @@ TOKEN = os.getenv("BOT_TOKEN")
 
 if __name__ == "__main__":
     if not TOKEN:
-        print("❌ Error: BOT_TOKEN is missing! Please set it in your environment variables.")
+        print("❌ Error: BOT_TOKEN is missing! Please set it in your .env file.")
         exit(1)
     if not MONGO_URI:
-        print("❌ Error: MONGO_URI is missing! Please set it in your environment variables.")
+        print("❌ Error: MONGO_URI is missing! Please set it in your .env file.")
         exit(1)
 
     application = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
