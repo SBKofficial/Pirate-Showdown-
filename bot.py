@@ -547,6 +547,7 @@ def get_stats_text(char_obj_or_name, player_fruit=None):
     ult_damage = MOVES[ult_name]['dmg']
     ult_desc = EFFECT_DESCRIPTIONS.get(name, "No additional effect.")
 
+    # UPDATED: Removed moves[1] to prevent "list index out of range"
     text = (
         f"《Name》: {name}\n"
         f"《Rarity》: {c['rarity']}\n"
@@ -558,13 +559,13 @@ def get_stats_text(char_obj_or_name, player_fruit=None):
         f"《SPE: {stats['spe']}\n"
         f"《 DEF: {stats['def']}\n\n"
         f"■ 《BASIC》: {c['moves'][0]}: Damage {MOVES[c['moves'][0]]['dmg']}\n"
-        f"● 《BASIC》: {c['moves'][1]}: Damage {MOVES[c['moves'][1]]['dmg']}\n"
         f"♤《 ULTIMATE》: {ult_name}: Damage {ult_damage}. {ult_desc}"
     )
     if weapon:
         w_data = WEAPONS[weapon]
         text += f"\n⚔️ 《WEAPON》: {weapon}: {w_data['spec']} (Dmg: {w_data['atk_val']})"
     return text
+
 
 def generate_char_instance(name, level=1, player_fruit=None, equipped_weapon=None):
     c = CHARACTERS.get(name, {
