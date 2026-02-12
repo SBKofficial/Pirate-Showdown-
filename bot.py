@@ -97,17 +97,18 @@ def save_player(user_id, player_data):
         print(f"Error saving player {user_id}: {e}")
 
 def load_player(user_id):
-    if players_collection is None: return None
+    if players_collection is None: 
+        return None
     try:
-        data = players_collection.find_one({"user_id": str(user_id)})
-        if data:
-            if '_id' in data:
-                del data['_id']
-            return data
-        return None
+        # Use projection {'_id': 0} to exclude the ID at the database level
+        # This is faster than deleting it in Python after fetching
+        data = players_collection.find_one({"user_id": str(user_id)}, {"_id": 0})
+        return data
     except Exception as e:
-        print(f"Error loading player {user_id}: {e}")
+        # Log the specific error to help with Termux debugging
+        logging.error(f"Error loading player {user_id}: {e}")
         return None
+
 
 init_db()
 
