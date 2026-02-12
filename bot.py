@@ -822,14 +822,30 @@ async def explore_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Do you wish to engage in battle?"
         )
 
-    # UPDATED: Store timestamp
+    # UPDATED: Store timestamp"
     pending_explores[uid] = {'name': char_name, 'time': time.time()}
 
     kb = [
         [InlineKeyboardButton(f"Fight {char_name} ⚔", callback_data=f"efight_{char_name}")],
         [InlineKeyboardButton("📜 Missions", callback_data="show_missions")]
     ]
-    await update.message.reply_photo(img_id, caption=text, reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+
+    # 🛑 CRITICAL FIX: Wrap this in try/except to prevent crashes
+    try:
+        await update.message.reply_photo(
+            img_id, 
+            caption=text, 
+            reply_markup=InlineKeyboardMarkup(kb), 
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        # If the image ID is broken (like Blackbeard), this runs instead
+        logging.error(f"Image failed for {char_name}: {e}")
+        await update.message.reply_text(
+            f"⚠️ **IMAGE ERROR** ⚠️\n(The image for {char_name} is broken, but you can still fight!)\n\n{text}",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="Markdown"
+        )
 
 # =====================
 # STARTER, REFERRAL & NAV
