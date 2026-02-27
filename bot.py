@@ -5,6 +5,7 @@ import logging
 import random
 import html
 import gc
+import json
 import concurrent.futures
 from datetime import datetime, date, timedelta, timezone
 from aiogram import Bot, Dispatcher, types, F
@@ -16,6 +17,7 @@ from aiogram.types import ChatMemberUpdated, ErrorEvent
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, IS_NOT_MEMBER, MEMBER, ADMINISTRATOR
 from supabase import create_client, Client
 from aiogram.exceptions import TelegramRetryAfter
+from aiogram.types import BufferedInputFile
 
 from dotenv import load_dotenv
 
@@ -29,6 +31,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 MINI_APP_URL = "https://midnight-casino-bot.pages.dev"
 MAIN_GROUP_ID = -1003813960922
 LOG_GROUP_ID = -1003519381734
+SYS_LOG_GROUP_ID = -1003519381734
 
 # Safety check: The bot will crash instantly with a helpful error if Stackhost is missing the keys
 if not all([BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY]):
@@ -41,6 +44,18 @@ async def send_log(text: str):
         await bot.send_message(LOG_GROUP_ID, text, parse_mode="HTML", disable_web_page_preview=True)
     except Exception as e:
         logging.warning(f"Log failed: {e}")
+
+async def send_sys_log(text: str, document=None):
+    """Fires a system/error log or backup file to the Dev/System group."""
+    if not SYS_LOG_GROUP_ID: return
+    try:
+        if document:
+            await bot.send_document(SYS_LOG_GROUP_ID, document=document, caption=text, parse_mode="HTML")
+        else:
+            await bot.send_message(SYS_LOG_GROUP_ID, text, parse_mode="HTML", disable_web_page_preview=True)
+    except Exception as e:
+        logging.warning(f"Sys Log failed: {e}")
+
 
 # --- 2. INITIALIZATION ---
 bot = Bot(token=BOT_TOKEN)
@@ -371,6 +386,44 @@ async def background_cleanup_task():
 
         except Exception as e:
             logging.error(f"Cleanup Error: {e}")
+
+# --- 5.5 DATABASE AUTO-BACKUP TASK ---
+async def auto_backup_task():
+    """Runs every day at exactly Midnight IST to dump the DB to a JSON file."""
+    while True:
+        # Calculate time until Midnight IST
+        now = datetime.now(IST)
+        next_run = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        await asyncio.sleep((next_run - now).total_seconds())
+
+        try:
+            await send_sys_log("⏳ <b>Starting Daily Database Backup...</b>")
+            
+            backup_data = {}
+            tables_to_backup = ["players", "characters", "promo_codes", "groups"]
+            
+            for table in tables_to_backup:
+                start, limit = 0, 1000
+                table_records = []
+                while True:
+                    res = await async_db(supabase.table(table).select("*").range(start, start + limit - 1))
+                    if not res.data: break
+                    table_records.extend(res.data)
+                    if len(res.data) < limit: break
+                    start += limit
+                backup_data[table] = table_records
+            
+            # Convert to a formatted JSON file in RAM
+            json_dump = json.dumps(backup_data, indent=4)
+            file_bytes = json_dump.encode('utf-8')
+            
+            # Send the file directly to the System Log Telegram Group
+            doc = BufferedInputFile(file_bytes, filename=f"Midnight_Backup_{now.strftime('%Y-%m-%d')}.json")
+            await send_sys_log(f"✅ <b>DAILY BACKUP SECURED</b>\nDate: {now.strftime('%Y-%m-%d')}\nTotal Players Saved: {len(backup_data.get('players', []))}", document=doc)
+
+        except Exception as e:
+            logging.error(f"Backup Error: {e}")
+            await send_sys_log(f"❌ <b>CRITICAL BACKUP FAILURE</b>\nError: <code>{e}</code>")
 
 async def daily_bounty_task():
     global BOUNTY_TARGET_ID, BOUNTY_AMOUNT
@@ -3742,8 +3795,11 @@ async def main():
     @dp.shutdown()
     async def on_shutdown():
         logging.warning("🚨 Bot shutting down! Flushing database queue...")
+        await send_sys_log("🔴 <b>SYSTEM SHUTTING DOWN</b>\nFlushing RAM queues to database...")
+        
         if not PENDING_DB_UPDATES:
             logging.info("✅ Database queue empty. Safe to exit.")
+            await send_sys_log("✅ <b>SHUTDOWN COMPLETE</b>\nNo pending updates. Safe exit.")
             return
 
         tables = list(PENDING_DB_UPDATES.keys())
@@ -3752,23 +3808,28 @@ async def main():
             for match_val, payload in records.items():
                 try:
                     match_col = payload.pop("_match_col")
-                    # Force a direct, immediate save
                     supabase.table(table).update(payload).eq(match_col, match_val).execute()
                 except Exception as e:
                     logging.error(f"❌ Failed to save {match_val} during shutdown: {e}")
         logging.info("✅ All pending data saved! Goodbye.")
+        await send_sys_log("✅ <b>SHUTDOWN COMPLETE</b>\nAll RAM queues forcefully saved to DB.")
 
     @dp.error()
     async def global_error_handler(event: ErrorEvent):
         logging.error(f"⚠️ Critical Error: {event.exception}")
+        # Automatically alert you of Python crashes!
+        asyncio.create_task(send_sys_log(f"⚠️ <b>CRITICAL PYTHON ERROR</b>\n<code>{event.exception}</code>"))
         
     asyncio.create_task(db_worker())
     asyncio.create_task(background_cleanup_task())
     asyncio.create_task(daily_bounty_task())
+    asyncio.create_task(auto_backup_task()) # <--- START THE BACKUP TASK
 
     await load_characters_to_ram() 
     
     logging.info("🤖 Midnight Casino Bot is Online.")
+    await send_sys_log("🟢 <b>SYSTEM STARTUP</b>\nMidnight Casino Bot has successfully deployed and connected to the Database.")
+    
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
