@@ -679,6 +679,7 @@ def get_start_screen(user_id: int, section: str, is_private: bool, bot_username:
             "<i>Steal from the rich, duel for glory.</i>\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "<code>/rob</code> — Steal gold (Reply to a user)\n"
+            "<code>/bounty</code> — View the active bounty\n"
             "<code>/buy</code> — Buy Guards/Dogs to block robberies\n"
             "<code>/duel [amt]</code> — Bo3 PvP using your own Harem\n"
             "<code>/draft [amt]</code> — Bo3 PvP using a shared deck\n"
@@ -2175,6 +2176,46 @@ async def cmd_codes(m: types.Message):
     except Exception as e:
         logging.error(f"Error in /codes: {e}")
         await m.answer("❌ Could not fetch codes right now.", parse_mode="HTML")
+    finally:
+        active_games.discard(m.from_user.id)
+
+@dp.message(Command("bounty"))
+async def cmd_bounty(m: types.Message):
+    if m.from_user.id in active_games: return await m.answer("⏳ Please wait...")
+    active_games.add(m.from_user.id)
+    
+    try:
+        global BOUNTY_TARGET_ID, BOUNTY_AMOUNT
+        
+        # 1. Check if the bounty is empty (claimed or not set)
+        if not BOUNTY_TARGET_ID:
+            return await m.answer(
+                "🎯 <b>BOUNTY BOARD: EMPTY</b>\n\n"
+                "The streets are quiet. The last bounty was claimed or expired.\n"
+                "<i>Wait for the Midnight reset for a new target.</i>", 
+                parse_mode="HTML"
+            )
+            
+        # 2. If active, fetch the target's latest name
+        res = await async_db(supabase.table("players").select("username").eq("id", BOUNTY_TARGET_ID))
+        
+        if res.data:
+            target_name = html.escape(res.data[0].get('username') or f"User_{BOUNTY_TARGET_ID}")
+            target_tag = f"<a href='tg://user?id={BOUNTY_TARGET_ID}'>@{target_name}</a>"
+            
+            await m.answer(
+                f"🎯 <b>ACTIVE BOUNTY</b> 🎯\n"
+                f"━━━━━━━━━━━━━━━━━━\n\n"
+                f"🩸 <b>Target:</b> {target_tag}\n"
+                f"💰 <b>Reward:</b> {BOUNTY_AMOUNT:,} gold\n\n"
+                f"<i>The first person to successfully /rob them claims this bonus from the House!</i>",
+                parse_mode="HTML"
+            )
+        else:
+            await m.answer("🎯 <b>ACTIVE BOUNTY</b>\nThe target is currently in hiding...", parse_mode="HTML")
+            
+    except Exception as e:
+        await m.answer(f"❌ Error checking the bounty board: {e}")
     finally:
         active_games.discard(m.from_user.id)
 
@@ -3785,6 +3826,7 @@ async def main():
         types.BotCommand(command="harem", description="View your collection"),
         types.BotCommand(command="equip", description="Equip Characters"),
         types.BotCommand(command="rob", description="🥷 Steal from a User"),
+        types.BotCommand(command="bounty", description="🥷 View the active bounty"),
         types.BotCommand(command="stats", description="📊 Your Record"),
         types.BotCommand(command="top", description="🏆 Richest Players"),
     ]
