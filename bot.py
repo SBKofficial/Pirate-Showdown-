@@ -126,9 +126,9 @@ PUB_MATRIX = {
 
 # --- DYNAMIC CARD MULTIPLIERS ---
 CARD_MULTIPLIERS = {
-    "2":  {"high": 1.1,  "low": 0.0},
-    "3":  {"high": 1.2,  "low": 12.0},
-    "4":  {"high": 1.3,  "low": 6.0},
+    "2":  {"high": 1.2,  "low": 0.0},
+    "3":  {"high": 1.3,  "low": 12.0},
+    "4":  {"high": 1.4,  "low": 6.0},
     "5":  {"high": 1.5,  "low": 4.0},
     "6":  {"high": 1.7,  "low": 3.0},
     "7":  {"high": 1.8,  "low": 2.2},
