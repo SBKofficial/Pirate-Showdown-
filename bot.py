@@ -3549,7 +3549,7 @@ async def generate_top_text(user: types.User, mode: str = "wealth"):
             rank = i + 1
             bal = format_suffix(player['balance'])
             raw_name = html.escape(player.get('username') or f"User_{player['id']}")
-            display_name = f"<a href='tg://user?id={player['id']}'>{raw_name}</a>"
+            display_name = f"<a>{raw_name}</a>"
             text += f"【{rank}】 {display_name} — {bal} 💰\n"
 
         text += f"━━━━━━━━━━━━━━━━━━\n📊 Your Wealth Rank — 【{user_rank}】"
@@ -3569,7 +3569,7 @@ async def generate_top_text(user: types.User, mode: str = "wealth"):
             lvl = player.get('level', 1)
             xp = format_suffix(player.get('xp', 0))
             raw_name = html.escape(player.get('username') or f"User_{player['id']}")
-            display_name = f"<a href='tg://user?id={player['id']}'>{raw_name}</a>"
+            display_name = f"<a>{raw_name}</a>"
             text += f"【{rank}】 {display_name} — Lvl {lvl} ({xp} XP)\n"
 
         text += f"━━━━━━━━━━━━━━━━━━\n📊 Your Level Rank — 【{user_rank}】"
