@@ -1137,7 +1137,7 @@ async def cmd_broadcast(m: types.Message):
         parse_mode="HTML"
     )
 
-@dp.message(Command("addchar"))
+@@dp.message(Command("addchar"))
 async def cmd_addchar(m: types.Message, command: CommandObject):
     # Security: Emperor Only
     if m.from_user.id != 7708811819: return
@@ -1145,40 +1145,48 @@ async def cmd_addchar(m: types.Message, command: CommandObject):
     args = command.args
     if not args:
         return await m.answer(
-            "❌ <b>Format:</b>\n`/addchar Name | Anime | Rarity`\n\n"
-            "<i>Example:</i> `/addchar Naruto Uzumaki | Naruto | Mythic`\n"
-            "<i>(The bot will automatically fetch the image from MyAnimeList!)</i>", 
+            "❌ <b>Format:</b>\n`/addchar Name | Anime | Rarity | [Optional URL]`\n\n"
+            "<i>Example 1 (Auto Fetch):</i> `/addchar Toji Fushiguro | Jujutsu Kaisen | Mythic`\n"
+            "<i>Example 2 (Manual HD Image):</i> `/addchar Toji | JJK | Mythic | https://my-hd-link.com/toji.jpg`", 
             parse_mode="HTML"
         )
     
     try:
         parts = [p.strip() for p in args.split("|")]
-        if len(parts) != 3:
-            return await m.answer("❌ <b>Format Error!</b> You only need 3 parts now: Name | Anime | Rarity", parse_mode="HTML")
+        if len(parts) < 3:
+            return await m.answer("❌ <b>Format Error!</b> You need at least: Name | Anime | Rarity", parse_mode="HTML")
         
         name, anime, rarity = parts[0], parts[1], parts[2].capitalize()
         
         if rarity not in RARITY_RATES:
             return await m.answer(f"❌ <b>Invalid rarity!</b> Must be Common, Rare, Epic, Legendary, or Mythic.", parse_mode="HTML")
             
-        status_msg = await m.answer("⏳ <i>Searching MyAnimeList for character data...</i>", parse_mode="HTML")
+        status_msg = await m.answer("⏳ <i>Processing character data...</i>", parse_mode="HTML")
 
-        # --- 🌐 AUTOMATIC IMAGE FETCHING (Jikan API) ---
-        safe_query = urllib.parse.quote(name)
-        api_url = f"https://api.jikan.moe/v4/characters?q={safe_query}&limit=1"
-        
         image_url = None
-        async with aiohttp.ClientSession() as session:
-            async with session.get(api_url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("data") and len(data["data"]) > 0:
-                        # Grab the high-res JPG from MAL
-                        image_url = data["data"][0]["images"]["jpg"]["image_url"]
+
+        # --- 🌟 THE FIX: MANUAL OVERRIDE CHECK ---
+        # If you provided a 4th part that looks like a link, use it!
+        if len(parts) >= 4 and parts[3].startswith("http"):
+            image_url = parts[3]
+        else:
+            # --- 🌐 AUTOMATIC IMAGE FETCHING (Improved Accuracy) ---
+            # We now search the Name AND the Anime together so it doesn't grab the wrong person
+            safe_query = urllib.parse.quote(f"{name} {anime}")
+            api_url = f"https://api.jikan.moe/v4/characters?q={safe_query}&limit=1"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        if data.get("data") and len(data["data"]) > 0:
+                            # Try to grab the high-quality webp first, fallback to jpg
+                            images = data["data"][0]["images"]
+                            image_url = images.get("webp", {}).get("image_url") or images.get("jpg", {}).get("image_url")
         
-        # Fallback if MAL doesn't find the character
+        # Fallback if MAL doesn't find the character and no manual link was provided
         if not image_url:
-            return await status_msg.edit_text(f"❌ <b>Search Failed!</b>\nCould not find a character named '{name}' on MyAnimeList. Try being more specific.", parse_mode="HTML")
+            return await status_msg.edit_text(f"❌ <b>Search Failed!</b>\nCould not find '{name}' automatically. Please use the manual URL override.", parse_mode="HTML")
 
         # --- 💾 DATABASE UPSERT LOGIC ---
         res = await async_db(supabase.table("characters").upsert({
