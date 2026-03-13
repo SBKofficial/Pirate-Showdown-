@@ -1137,7 +1137,7 @@ async def cmd_broadcast(m: types.Message):
         parse_mode="HTML"
     )
 
-@@dp.message(Command("addchar"))
+@dp.message(Command("addchar"))
 async def cmd_addchar(m: types.Message, command: CommandObject):
     # Security: Emperor Only
     if m.from_user.id != 7708811819: return
