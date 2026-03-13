@@ -28,7 +28,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-MINI_APP_URL = "https://midnight-casino-bot.pages.dev"
+MINI_APP_URL = "https://midnight-casino-bot.netlify.app"
 MAIN_GROUP_ID = -1003813960922
 LOG_GROUP_ID = -1003519381734
 SYS_LOG_GROUP_ID = -1003519381734
