@@ -337,7 +337,7 @@ async def daily_drop_task():
         tomorrow = (now_after + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
         await asyncio.sleep((tomorrow - now_after).total_seconds())
 
-@dp.message(F.chat.type == "private")
+@dp.message(F.chat.type == "private", F.text, ~F.text.startswith("/"))
 async def handle_private_messages(m: types.Message):
     """Catches user responses for the Cipher hacking task."""
     if m.text and not m.text.startswith("/") and m.from_user.id in active_drop_tasks:
