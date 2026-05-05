@@ -3088,8 +3088,13 @@ async def cmd_earn(m: types.Message):
     except asyncio.TimeoutError:
         await m.answer("❌ Connection to Ad-Server timed out. The Syndicate network is unstable.")
     except Exception as e:
-        logging.error(f"Earn Error: {e}")
-        await m.answer("❌ Error reaching the sponsor.")
+        logging.error(f"Earn Error: {repr(e)}")
+        # Check if it's a missing ad link (Adsgram has no inventory right now)
+        if isinstance(e, KeyError):
+            await m.answer("🛑 <b>No Contracts Available</b>\nAdsgram doesn't have an ad for your region right now. Try again later.", parse_mode="HTML")
+        else:
+            # If it's a different error, print the exact code so we can fix it!
+            await m.answer(f"❌ <b>Diagnostic Error:</b>\n<code>{repr(e)}</code>", parse_mode="HTML")
     finally:
         active_games.discard(m.from_user.id)
 
