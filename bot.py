@@ -3059,8 +3059,10 @@ async def cmd_earn(m: types.Message):
                 if resp.status != 200:
                     # Give a small 1-minute penalty if the server is busy so they don't spam the API
                     EARN_COOLDOWNS[m.from_user.id] = now - 240 
-                    return await m.answer(f"🛑 <b>Ad Server Busy</b>\nNo contracts available right now. Try again shortly.", parse_mode="HTML")
-                ad_data = await resp.json()
+                    return await m.answer(f"🛑 <b>Ad Server Busy ({resp.status})</b>\nNo contracts available right now.", parse_mode="HTML")
+                
+                # THE FIX: Force it to read the data even if Adsgram sent it as 'text/plain'
+                ad_data = await resp.json(content_type=None)
 
         # 4. Success! Lock in the 5-minute cooldown
         EARN_COOLDOWNS[m.from_user.id] = now
