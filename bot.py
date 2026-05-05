@@ -3021,7 +3021,21 @@ async def handle_web_app_data(m: types.Message):
 
 @dp.message(Command("earn"))
 async def cmd_earn(m: types.Message):
-    # 1. Check the 5-Minute Cooldown
+    # 1. FORCE DM (PRIVATE CHAT) ONLY
+    if m.chat.type != "private":
+        bot_user = await bot.get_me()
+        kb = types.InlineKeyboardMarkup(inline_keyboard=[[
+            types.InlineKeyboardButton(text="💼 Go to Vault (DM)", url=f"https://t.me/{bot_user.username}?start=earn")
+        ]])
+        return await m.answer(
+            "🛑 <b>Confidential Contracts</b>\n"
+            "<i>The Bouncer shakes his head.</i>\n"
+            "Syndicate jobs can only be discussed in private.", 
+            reply_markup=kb, 
+            parse_mode="HTML"
+        )
+
+    # 2. Check the 5-Minute Cooldown
     now = datetime.now().timestamp()
     last_used = EARN_COOLDOWNS.get(m.from_user.id, 0)
     if now - last_used < 300: # 300 seconds = 5 minutes
@@ -3033,7 +3047,7 @@ async def cmd_earn(m: types.Message):
     active_games.add(m.from_user.id)
     
     try:
-        # 2. Check the Daily Limit (5 Max)
+        # 3. Check the Daily Limit (5 Max)
         p = await get_player_fast(m.from_user)
         today_str = str(datetime.now(IST).date())
         count = p.get('tasks_completed', 0) if p.get('last_task_date') == today_str else 0
@@ -3052,19 +3066,18 @@ async def cmd_earn(m: types.Message):
             f"&token={ADSGRAM_TOKEN}"
         )
         
-        # 3. Fetch from Adsgram
+        # 4. Fetch from Adsgram
         timeout = aiohttp.ClientTimeout(total=10)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(api_url) as resp:
                 if resp.status != 200:
-                    # Give a small 1-minute penalty if the server is busy so they don't spam the API
                     EARN_COOLDOWNS[m.from_user.id] = now - 240 
                     return await m.answer(f"🛑 <b>Ad Server Busy ({resp.status})</b>\nNo contracts available right now.", parse_mode="HTML")
                 
-                # THE FIX: Force it to read the data even if Adsgram sent it as 'text/plain'
+                # Force JSON parse (Fixes the text/plain issue)
                 ad_data = await resp.json(content_type=None)
 
-        # 4. Success! Lock in the 5-minute cooldown
+        # 5. Success! Lock in the 5-minute cooldown
         EARN_COOLDOWNS[m.from_user.id] = now
 
         ad_text = ad_data.get('text_html', 'Complete this sponsor task for gold!')
@@ -3094,7 +3107,6 @@ async def cmd_earn(m: types.Message):
         if isinstance(e, KeyError):
             await m.answer("🛑 <b>No Contracts Available</b>\nAdsgram doesn't have an ad for your region right now. Try again later.", parse_mode="HTML")
         else:
-            # Escape the error so Telegram doesn't confuse it for HTML tags
             safe_error = html.escape(repr(e))
             await m.answer(f"❌ <b>Diagnostic Error:</b>\n<code>{safe_error}</code>", parse_mode="HTML")
     finally:
@@ -3116,6 +3128,7 @@ async def cmd_start(m: types.Message, command: CommandObject = None):
         elif args == "daily": return await cmd_daily(m)
         elif args == "bank": return await cmd_bank(m)
         elif args == "limit": return await cmd_stats(m)
+        elif args == "earn": return await cmd_earn(m) # <--- ADD THIS LINE
 
         elif args.startswith("ad_reward_"):
             try:
