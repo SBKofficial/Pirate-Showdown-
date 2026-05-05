@@ -3015,45 +3015,44 @@ async def cmd_earn(m: types.Message):
     
     try:
         await m.chat.do("typing")
-        # Fetch the ad from Adsgram
-        api_url = f"https://api.adsgram.ai/advbot?tgid={m.from_user.id}&blockid={ADSGRAM_BLOCK_ID}&language=en&token={ADSGRAM_TOKEN}"
+        
+        # Ensure ADSGRAM_BLOCK_ID is just numbers!
+        clean_block_id = ''.join(filter(str.isdigit, str(ADSGRAM_BLOCK_ID)))
+        
+        api_url = (
+            f"https://api.adsgram.ai/advbot"
+            f"?tgid={m.from_user.id}"
+            f"&blockid={clean_block_id}"
+            f"&language=en"
+            f"&token={ADSGRAM_TOKEN}"
+        )
         
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as resp:
                 if resp.status != 200:
-                    return await m.answer("🛑 <b>No Contracts Available</b>\nCheck back later for new sponsor tasks.", parse_mode="HTML")
+                    error_body = await resp.text()
+                    logging.error(f"Adsgram API Failed! Status: {resp.status}, Body: {error_body}")
+                    return await m.answer(f"🛑 <b>Ad Server Busy ({resp.status})</b>\nNo contracts found. Try again in a few minutes.", parse_mode="HTML")
+                
                 ad_data = await resp.json()
 
-        # Extract data from the JSON you provided
+        # UI Rendering Logic (Same as before)
         ad_text = ad_data.get('text_html', 'Check out our sponsor!')
-        image = ad_data.get('image_url')
-        btn_go = ad_data.get('button_name', 'Go!')
-        btn_reward = ad_data.get('button_reward_name', 'Claim reward!')
-        
         kb = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text=f"🚀 {btn_go}", url=ad_data['click_url'])],
-            [types.InlineKeyboardButton(text=f"🎁 {btn_reward}", url=ad_data['reward_url'])]
+            [types.InlineKeyboardButton(text=f"🚀 {ad_data.get('button_name', 'Go!')}", url=ad_data['click_url'])],
+            [types.InlineKeyboardButton(text=f"🎁 {ad_data.get('button_reward_name', 'Claim reward!')}", url=ad_data['reward_url'])]
         ])
 
-        caption = (
-            f"📢 <b>𝗦𝗬𝗡𝗗𝗜𝗖𝗔𝗧𝗘 𝗦𝗣𝗢𝗡𝗦𝗢𝗥</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"{ad_text}\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"<i>Follow the link, complete the task, then click claim.</i>"
-        )
-
-        if image:
-            await m.answer_photo(photo=image, caption=caption, reply_markup=kb, parse_mode="HTML")
+        if ad_data.get('image_url'):
+            await m.answer_photo(photo=ad_data['image_url'], caption=ad_text, reply_markup=kb, parse_mode="HTML")
         else:
-            await m.answer(caption, reply_markup=kb, parse_mode="HTML")
+            await m.answer(ad_text, reply_markup=kb, parse_mode="HTML")
             
     except Exception as e:
-        logging.error(f"Adsgram Error: {e}")
-        await m.answer("❌ Error connecting to the syndicate ad-server.")
+        logging.error(f"Adsgram Connection Error: {e}")
+        await m.answer("❌ Connection to Syndicate Ad-Server timed out.")
     finally:
         active_games.discard(m.from_user.id)
-
 
 @dp.message(Command("start"))
 async def cmd_start(m: types.Message, command: CommandObject = None):
