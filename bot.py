@@ -3089,12 +3089,12 @@ async def cmd_earn(m: types.Message):
         await m.answer("❌ Connection to Ad-Server timed out. The Syndicate network is unstable.")
     except Exception as e:
         logging.error(f"Earn Error: {repr(e)}")
-        # Check if it's a missing ad link (Adsgram has no inventory right now)
         if isinstance(e, KeyError):
             await m.answer("🛑 <b>No Contracts Available</b>\nAdsgram doesn't have an ad for your region right now. Try again later.", parse_mode="HTML")
         else:
-            # If it's a different error, print the exact code so we can fix it!
-            await m.answer(f"❌ <b>Diagnostic Error:</b>\n<code>{repr(e)}</code>", parse_mode="HTML")
+            # Escape the error so Telegram doesn't confuse it for HTML tags
+            safe_error = html.escape(repr(e))
+            await m.answer(f"❌ <b>Diagnostic Error:</b>\n<code>{safe_error}</code>", parse_mode="HTML")
     finally:
         active_games.discard(m.from_user.id)
 
@@ -7823,9 +7823,10 @@ async def main():
     @dp.error()
     async def global_error_handler(event: ErrorEvent):
         logging.error(f"⚠️ Critical Error: {event.exception}")
-        # Automatically alert you of Python crashes!
-        asyncio.create_task(send_sys_log(f"⚠️ <b>CRITICAL PYTHON ERROR</b>\n<code>{event.exception}</code>"))
-        
+        # Use html.escape to prevent angled brackets from breaking Telegram formatting!
+        safe_error = html.escape(str(event.exception))
+        asyncio.create_task(send_sys_log(f"⚠️ <b>CRITICAL PYTHON ERROR</b>\n<code>{safe_error}</code>"))
+
     asyncio.create_task(db_worker())
     asyncio.create_task(background_cleanup_task())
     asyncio.create_task(daily_bounty_task())
