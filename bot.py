@@ -4516,14 +4516,19 @@ async def handle_cards(call: types.CallbackQuery):
     finally:
         active_games.discard(call.from_user.id)
 
-
 def format_suffix(num):
     """Converts large numbers into clean K, M, B formats."""
+    if num >= 1_000_000_000_000_000_000_000_000_000: return f"{num/1_000_000_000_000_000_000_000_000_000:.1f}Ot"
+    if num >= 1_000_000_000_000_000_000_000_000: return f"{num/1_000_000_000_000_000_000_000_000:.1f}Sp"
+    if num >= 1_000_000_000_000_000_000_000: return f"{num/1_000_000_000_000_000_000_000:.1f}Sx"
+    if num >= 1_000_000_000_000_000_000: return f"{num/1_000_000_000_000_000_000:.1f}Qn"
+    if num >= 1_000_000_000_000_000: return f"{num/1_000_000_000_000_000:.1f}Qd"
+    if num >= 1_000_000_000_000: return f"{num/1_000_000_000_000:.1f}T"
     if num >= 1_000_000_000: return f"{num/1_000_000_000:.1f}B"
     if num >= 1_000_000: return f"{num/1_000_000:.1f}M"
     if num >= 10_000: return f"{num/1_000:.1f}K"
     return f"{num:,}" # Keeps commas for smaller balances
-
+	
 async def generate_top_text(user: types.User, mode: str = "wealth"):
     """Generates the minimal Top 5 leaderboard text for either Wealth or Level."""
     p = await get_player_fast(user)
