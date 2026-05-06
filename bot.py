@@ -7315,11 +7315,11 @@ async def handle_he_start(call: types.CallbackQuery):
     asyncio.create_task(run_heist_stage(host_id))
 
 HEIST_STAGES = {
-    1: {"name": "The Lobby", "mult": 0.5, "cops": 0.25, "desc": "You just walked in. Running now means losing half your stash to the getaway driver."},
-    2: {"name": "The Security Grid", "mult": 1.2, "cops": 0.40, "desc": "Dodging the laser grid. Sweating a little."},
-    3: {"name": "The Vault Door", "mult": 2.2, "cops": 0.55, "desc": "Planting the thermite. Sirens wailing in the distance."},
-    4: {"name": "The Inner Safe", "mult": 4.5, "cops": 0.70, "desc": "Bagging the gold. The police have surrounded the building."},
-    5: {"name": "The Police Standoff", "mult": 10.0, "cops": 0.85, "desc": "Shooting your way out through the lobby. Pure chaos."},
+    1: {"name": "The Lobby", "mult": 0.8, "cops": 0.10, "desc": "You just walked in. Running now means losing half your stash to the getaway driver."},
+    2: {"name": "The Security Grid", "mult": 1.2, "cops": 0.25, "desc": "Dodging the laser grid. Sweating a little."},
+    3: {"name": "The Vault Door", "mult": 2.2, "cops": 0.45, "desc": "Planting the thermite. Sirens wailing in the distance."},
+    4: {"name": "The Inner Safe", "mult": 4.5, "cops": 0.60, "desc": "Bagging the gold. The police have surrounded the building."},
+    5: {"name": "The Police Standoff", "mult": 10.0, "cops": 0.75, "desc": "Shooting your way out through the lobby. Pure chaos."},
     6: {"name": "The Rooftop Getaway", "mult": 25.0, "cops": 0.95, "desc": "Sprinting for the chopper under heavy sniper fire."}
 }
 
