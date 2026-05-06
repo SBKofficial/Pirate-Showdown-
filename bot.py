@@ -23,7 +23,6 @@ from aiogram.types import BufferedInputFile
 
 from dotenv import load_dotenv
 
-# This loads a local .env file if you are testing on your computer
 load_dotenv() 
 
 # --- 1. CREDENTIALS (SECURED) ---
