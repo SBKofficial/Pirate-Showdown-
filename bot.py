@@ -40,6 +40,9 @@ EARN_COOLDOWNS = {} # 👈 ADD THIS: Tracks the 5-minute /earn cooldown
 EARN_TASKS = {}
 PENDING_AD_CLAIMS = {}
 
+# --- GLOBAL STATE & QUEUES ---
+DB_QUEUE = {}  # 👈 ADD THIS LINE: This fixes the 'name not defined' error
+
 # --- ADSGRAM CREDENTIALS ---
 ADSGRAM_BLOCK_ID = os.getenv("ADSGRAM_BLOCK_ID") or "23671"
 ADSGRAM_TOKEN = os.getenv("ADSGRAM_TOKEN") or "b1231df256914e13936b24ad03576743"
