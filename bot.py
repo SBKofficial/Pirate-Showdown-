@@ -680,6 +680,11 @@ async def daily_bounty_task():
 # --- 6. DATABASE MIGRATION ---
 def run_migrations():
     migration_query = """
+    -- UPGRADE ECONOMY LIMITS TO INFINITE NUMERIC
+    ALTER TABLE public.players ALTER COLUMN balance TYPE NUMERIC;
+    ALTER TABLE public.players ALTER COLUMN bank_balance TYPE NUMERIC;
+    ALTER TABLE public.players ALTER COLUMN pub_balance TYPE NUMERIC;
+
     -- Existing Player Columns
     ALTER TABLE public.players 
     ADD COLUMN IF NOT EXISTS referred_by BIGINT,
@@ -753,7 +758,7 @@ def run_migrations():
     LANGUAGE plpgsql
     AS $$
     DECLARE
-      total_supply bigint;
+      total_supply NUMERIC; -- 👈 CHANGED FROM bigint TO NUMERIC
       player_count bigint;
       t_wins bigint;
       t_losses bigint;
@@ -763,6 +768,7 @@ def run_migrations():
       SELECT sum(balance), count(*), sum(wins), sum(total_losses), sum(robs_won), sum(robs_lost)
       INTO total_supply, player_count, t_wins, t_losses, r_won, r_lost
       FROM public.players;
+
 
       RETURN json_build_object(
         'supply', COALESCE(total_supply, 0),
